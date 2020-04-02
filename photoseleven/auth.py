@@ -4,7 +4,7 @@ from functools import wraps
 import jwt
 import os
 from photoseleven.db import get_db
-from photoseleven.error import only_json_content, responce_fail, responce_success
+from photoseleven.error import only_json_content, response_fail, response_success
 import re
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -32,56 +32,56 @@ def users_manipulation(data):
     PUT   : update user password
     DELETE: delete registered user"""
     if not data['username']:
-        return responce_fail(AuthErrors.ERR_AUTH_NO_USERNAME, 401)
+        return response_fail(AuthErrors.ERR_AUTH_NO_USERNAME, 401)
 
     if not data['password']:
-        return responce_fail(AuthErrors.ERR_AUTH_NO_PASSWORD, 401)
+        return response_fail(AuthErrors.ERR_AUTH_NO_PASSWORD, 401)
 
     db = get_db()
 
     # Processing POST
     if request.method == 'POST':
         if db.users.find_one({'username': data['username']}) is not None:
-            return responce_fail(AuthErrors.ERR_AUTH_USER_EXISTS, 401)
+            return response_fail(AuthErrors.ERR_AUTH_USER_EXISTS, 401)
 
         db.users.insert_one({'username': data['username'], 'password': generate_password_hash(data['password'])})
-        return responce_success(201)
+        return response_success(201)
 
     # Processing PUT
     if request.method == 'PUT':
         if not data['new_password']:
-            return responce_fail(AuthErrors.ERR_AUTH_NO_NEW_PASSWORD, 412)
+            return response_fail(AuthErrors.ERR_AUTH_NO_NEW_PASSWORD, 412)
 
         user = db.users.find_one({'username': data['username']})
         if user is None:
-            return responce_fail(AuthErrors.ERR_AUTH_USER_NOT_EXIST, 401)
+            return response_fail(AuthErrors.ERR_AUTH_USER_NOT_EXIST, 401)
 
         if not check_password_hash(user['password'], data['password']):
-            return responce_fail(AuthErrors.ERR_AUTH_WRONG_PASSWORD, 401)
+            return response_fail(AuthErrors.ERR_AUTH_WRONG_PASSWORD, 401)
 
         if check_password_hash(user['password'], data['new_password']):
-            return responce_fail(AuthErrors.ERR_AUTH_SAME_NEW_PASS, 412)
+            return response_fail(AuthErrors.ERR_AUTH_SAME_NEW_PASS, 412)
 
         res = db.users.update_one({'_id': user['_id']},
                                   {'$set': {'password': generate_password_hash(data['new_password'])}},
                                   upsert=False)
         assert res.modified_count == 1
 
-        return responce_success(200)
+        return response_success(200)
 
     # Processing DELETE
     else:
         user = db.users.find_one({'username': data['username']})
         if user is None:
-            return responce_fail(AuthErrors.ERR_AUTH_USER_NOT_EXIST, 401)
+            return response_fail(AuthErrors.ERR_AUTH_USER_NOT_EXIST, 401)
 
         if not check_password_hash(user['password'], data['password']):
-            return responce_fail(AuthErrors.ERR_AUTH_WRONG_PASSWORD, 401)
+            return response_fail(AuthErrors.ERR_AUTH_WRONG_PASSWORD, 401)
 
         res = db.users.delete_one({'_id': user['_id']})
         assert res.deleted_count == 1
 
-        return responce_success(200)
+        return response_success(200)
 
 
 @bp.route('/login', methods=['POST'])
@@ -89,18 +89,18 @@ def users_manipulation(data):
 def login(data):
     """To login the user and get back a token"""
     if not data['username']:
-        return responce_fail(AuthErrors.ERR_AUTH_NO_USERNAME, 401)
+        return response_fail(AuthErrors.ERR_AUTH_NO_USERNAME, 401)
 
     if not data['password']:
-        return responce_fail(AuthErrors.ERR_AUTH_NO_PASSWORD, 401)
+        return response_fail(AuthErrors.ERR_AUTH_NO_PASSWORD, 401)
 
     db = get_db()
     user = db.users.find_one({'username': data['username']})
     if user is None:
-        return responce_fail(AuthErrors.ERR_AUTH_USER_NOT_EXIST, 401)
+        return response_fail(AuthErrors.ERR_AUTH_USER_NOT_EXIST, 401)
 
     if not check_password_hash(user['password'], data['password']):
-        return responce_fail(AuthErrors.ERR_AUTH_WRONG_PASSWORD, 401)
+        return response_fail(AuthErrors.ERR_AUTH_WRONG_PASSWORD, 401)
 
     token = jwt.encode({'username': user['username'],
                         'exp': datetime.datetime.utcnow() + datetime.timedelta(
@@ -116,31 +116,31 @@ def login_required(view):
     def wrapped(*args, **kwargs):
         bearer_jwt = request.headers.get('Authorization')
         if bearer_jwt is None:
-            return responce_fail(AuthErrors.ERR_AUTH_NO_AUTH_HEADER, 401)
+            return response_fail(AuthErrors.ERR_AUTH_NO_AUTH_HEADER, 401)
 
         match = re.fullmatch(r'Bearer ([a-zA-Z0-9-_.]+\.[a-zA-Z0-9-_.]+\.[a-zA-Z0-9-_.]+)', bearer_jwt)
         if match is not None:
             token = match[1]
         else:
-            return responce_fail(AuthErrors.ERR_AUTH_NO_AUTH_HEADER, 401)
+            return response_fail(AuthErrors.ERR_AUTH_NO_AUTH_HEADER, 401)
 
         assert token is not None
 
         try:
             data = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms='HS256')
         except jwt.ExpiredSignatureError:
-            return responce_fail(AuthErrors.ERR_AUTH_TOKEN_EXPIRED, 401)
+            return response_fail(AuthErrors.ERR_AUTH_TOKEN_EXPIRED, 401)
         except jwt.InvalidTokenError:
-            return responce_fail(AuthErrors.ERR_AUTH_TOKEN_INVALID, 401)
+            return response_fail(AuthErrors.ERR_AUTH_TOKEN_INVALID, 401)
 
         assert data is not None
 
         if not data.get('username', None):
-            return responce_fail(AuthErrors.ERR_AUTH_NO_USERNAME, 401)
+            return response_fail(AuthErrors.ERR_AUTH_NO_USERNAME, 401)
 
         user = get_db().users.find_one({'username': data['username']})
         if user is None:
-            return responce_fail(AuthErrors.ERR_AUTH_USER_NOT_EXIST, 401)
+            return response_fail(AuthErrors.ERR_AUTH_USER_NOT_EXIST, 401)
 
         g.user = user
         return view(*args, **kwargs)
