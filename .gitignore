@@ -4,6 +4,7 @@
 # DEV
 instance
 venv
+dev
 
 #Pyhon
 *.pyc

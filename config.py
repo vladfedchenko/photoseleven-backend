@@ -16,7 +16,7 @@ class ProductionConfig(BaseConfig):
 
 
 class DevelopmentConfig(BaseConfig):
-    UPLOADS_DIR = '/tmp/photoseleven-dev'
+    UPLOADS_DIR = 'dev'
     DEBUG = True
 
 

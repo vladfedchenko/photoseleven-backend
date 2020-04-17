@@ -2,7 +2,6 @@ import datetime
 from flask import Blueprint, request, current_app, jsonify, make_response, g
 from functools import wraps
 import jwt
-import os
 from photoseleven.db import get_db
 from photoseleven.error import only_json_content, response_fail, response_success
 import re
@@ -143,6 +142,7 @@ def login_required(view):
             return response_fail(AuthErrors.ERR_AUTH_USER_NOT_EXIST, 401)
 
         g.user = user
+        g.token = token
         return view(*args, **kwargs)
 
     return wrapped
